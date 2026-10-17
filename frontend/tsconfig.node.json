@@ -1,0 +1,1 @@
+{"compilerOptions":{"module":"ESNext","moduleResolution":"Node","allowFsTyping":true,"composite":true,"types":["vitest/globals"]},"include":["vite.config.ts"]}

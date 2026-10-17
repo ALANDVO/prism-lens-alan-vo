@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "name": "prism-lens-alan-vo",
+  "owner": "ALANDVO",
+  "email": "alanvo@gmail.com",
+  "domain": "AI/ML developer tools",
+  "auth": "oidc-keycloak-saml-broker",
+  "llm_providers": [
+    "openai-compatible",
+    "anthropic",
+    "gemini",
+    "ollama"
+  ],
+  "workflows": [
+    "Upload a Cursor plugin archive to run deterministic validation checks across manifest, skills, agents, hooks, MCP servers, path existence, symlinks, and OAuth configuration",
+    "View detailed validation reports with severity and category filtering, then export as JSON or text",
+    "Request an opt-in LLM advisory that explains why detected findings would block plugin loading, grounded in the actual check records"
+  ],
+  "summary": "Work in progress: prism-lens-alan-vo",
+  "version": "1.0.0",
+  "status": "work-in-progress"
+}

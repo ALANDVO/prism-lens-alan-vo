@@ -11,9 +11,12 @@ Roles: viewer, analyst, admin.
 
 from __future__ import annotations
 
+import time
 from enum import Enum
 from functools import lru_cache
 
+from authlib.jose import JsonWebToken, jwt
+from authlib.jose.errors import JoseError
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -50,9 +53,90 @@ class AuthError(Exception):
     pass
 
 
+class JWKSCache:
+    """Cache for JWKS (JSON Web Key Set) with TTL."""
+
+    def __init__(self, ttl_seconds: int = 3600):
+        self._jwks: dict | None = None
+        self._expires_at: float = 0
+        self._ttl = ttl_seconds
+
+    async def get_jwks(self, settings) -> dict:
+        """Fetch JWKS from Keycloak, using cached value if not expired."""
+        now = time.time()
+        if self._jwks is not None and now < self._expires_at:
+            return self._jwks
+
+        jwks_url = f"{settings.keycloak_server_url.rstrip('/')}/realms/{settings.keycloak_realm}/protocol/openid-connect/certs"
+
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(jwks_url)
+            response.raise_for_status()
+            self._jwks = response.json()
+            self._expires_at = now + self._ttl
+            return self._jwks
+
+
+_jwks_cache = JWKSCache()
+
+
 @lru_cache(maxsize=1)
 def _demo_user() -> UserContext:
     return UserContext(sub="demo", role="admin", name="Demo User")
+
+
+async def _validate_oidc_token(token: str, settings) -> UserContext:
+    """Validate an OIDC Bearer token against Keycloak.
+
+    Validates: signature (RS256), issuer, audience, expiration, not-before.
+    Returns UserContext with sub and role from claims.
+    """
+    jwks = await _jwks_cache.get_jwks(settings)
+
+    # Expected claims for validation
+    expected_issuer = f"{settings.keycloak_server_url.rstrip('/')}/realms/{settings.keycloak_realm}"
+    expected_audience = settings.keycloak_client_id
+
+    try:
+        # Decode and validate the token
+        claims = jwt.decode(
+            token,
+            jwks,
+            claims_options={
+                "iss": {"essential": True, "value": expected_issuer},
+                "aud": {"essential": True, "value": expected_audience},
+                "exp": {"essential": True},
+                "nbf": {"essential": True},
+            },
+        )
+
+        # Validate the claims
+        claims.validate()
+
+    except JoseError as exc:
+        raise AuthError(f"Invalid token: {exc}") from exc
+
+    # Extract user info from claims
+    sub = claims.get("sub")
+    if not sub:
+        raise AuthError("Token missing 'sub' claim")
+
+    # Extract role from realm_access.roles (Keycloak standard)
+    realm_access = claims.get("realm_access", {})
+    roles = realm_access.get("roles", [])
+
+    # Map Keycloak roles to our roles (highest priority wins)
+    role = "viewer"
+    if "admin" in roles:
+        role = "admin"
+    elif "analyst" in roles:
+        role = "analyst"
+
+    name = claims.get("preferred_username") or claims.get("name") or sub
+
+    return UserContext(sub=sub, role=role, name=name)
 
 
 def get_current_user(
@@ -76,14 +160,24 @@ def get_current_user(
         raise AuthError("Missing Bearer token")
 
     token = credentials.credentials
-    # In a full deployment, validate the JWT signature, issuer, audience,
-    # and nonce against the Keycloak well-known endpoint.  The token
-    # carries the 'role' claim.
-    # This is a placeholder for the OIDC validation step.
-    raise AuthError(
-        "Bearer token authentication requires production OIDC configuration. "
-        "Set DEV_MODE=true for local development."
-    )
+
+    try:
+        # Run the async validation in a sync context via create_task
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        user = loop.run_until_complete(_validate_oidc_token(token, settings))
+        return user
+
+    except AuthError:
+        raise
+    except Exception as exc:
+        raise AuthError(f"Token validation failed: {exc}") from exc
 
 
 def require_role(min_role: Role):

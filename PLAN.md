@@ -79,7 +79,7 @@ Tests: `frontend/src/tests/Dashboard.test.tsx`, `frontend/src/tests/UploadForm.t
 
 ### auth-keycloak — Keycloak OIDC authentication
 
-Status: in_progress
+Status: done
 
 Acceptance:
 - OIDC authorization code with state + nonce + PKCE

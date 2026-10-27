@@ -1,1 +1,136 @@
-{"schema_version":1,"current_feature":"docker-compose-ci","features":[{"id":"plugin-validation-engine","title":"Plugin validation engine","status":"done","acceptance":["Upload a plugin zip archive and run all validation checks","Checks cover manifest, skills, agents, hooks, mcp, path existence, symlinks, and OAuth config","Report has severity-filterable results grouped by category","Deterministic: no LLM key required for offline validation"],"implementation":["backend/app/services/checks.py","backend/app/services/validator.py","backend/app/services/archiver.py"],"tests":["backend/tests/test_checks.py","backend/tests/test_validator.py"]},{"id":"plugin-api","title":"Plugin validation REST API","status":"done","acceptance":["POST /api/v1/plugins/validate accepts an archive and returns a report ID","GET /api/v1/reports lists reports with pagination and filtering","GET /api/v1/reports/{id} returns a full report","GET /api/v1/reports/{id}/export returns report as JSON or text"],"implementation":["backend/app/api/plugins.py","backend/app/api/reports.py"],"tests":["backend/tests/test_api.py"]},{"id":"report-persistence","title":"SQLite persistence and audit log","status":"done","acceptance":["Reports and checks stored in SQLite with UTC timestamps","Audit log records all validation actions","Pagination and filtering on report listing"],"implementation":["backend/app/db/database.py","backend/app/models/orm.py"],"tests":["backend/tests/test_api.py"]},{"id":"llm-advisory","title":"Opt-in LLM advisory explanations","status":"done","acceptance":["POST /api/v1/reports/{id}/advisory generates natural-language explanation","Supports OpenAI-compatible, Anthropic, Gemini, Ollama providers","Errors are clear and redacted when no key or provider failure","Advisory is labeled as advisory, grounded in actual report records"],"implementation":["backend/app/services/llm.py","backend/app/api/reports.py"],"tests":["backend/tests/test_llm.py"]},{"id":"frontend-dashboard","title":"React dashboard with validate/detail/export workflows","status":"done","acceptance":["Upload a plugin archive and view validation results","Search and filter reports","View detailed check results with severity filtering","Export reports as JSON or text"],"implementation":["frontend/src/pages/Dashboard.tsx","frontend/src/pages/ValidatePage.tsx","frontend/src/pages/ReportDetail.tsx","frontend/src/components/"],"tests":["frontend/src/tests/Dashboard.test.tsx","frontend/src/tests/UploadForm.test.tsx","frontend/src/tests/ReportDetail.test.tsx"]},{"id":"auth-keycloak","title":"Keycloak OIDC authentication","status":"in_progress","acceptance":["OIDC authorization code with state + nonce + PKCE","HttpOnly SameSite cookies with CSRF protection","Roles: viewer, analyst, admin","Realm import for SAML identity brokering"],"implementation":["backend/app/core/security.py","keycloak/realm-export.json"],"tests":["backend/tests/test_api.py"]},{"id":"docker-compose-ci","title":"Docker, compose, CI workflow","status":"done","acceptance":["Dockerfiles with nonroot users","compose.yaml with Keycloak and persistent volumes","CI workflow testing backend and frontend"],"implementation":["backend/Dockerfile","frontend/Dockerfile","compose.yaml",".github/workflows/ci.yml"],"tests":[]}]}
+{
+  "schema_version": 1,
+  "current_feature": "docker-compose-ci",
+  "features": [
+    {
+      "id": "plugin-validation-engine",
+      "title": "Plugin validation engine",
+      "status": "done",
+      "acceptance": [
+        "Upload a plugin zip archive and run all validation checks",
+        "Checks cover manifest, skills, agents, hooks, mcp, path existence, symlinks, and OAuth config",
+        "Report has severity-filterable results grouped by category",
+        "Deterministic: no LLM key required for offline validation"
+      ],
+      "implementation": [
+        "backend/app/services/checks.py",
+        "backend/app/services/validator.py",
+        "backend/app/services/archiver.py"
+      ],
+      "tests": [
+        "backend/tests/test_checks.py",
+        "backend/tests/test_validator.py"
+      ]
+    },
+    {
+      "id": "plugin-api",
+      "title": "Plugin validation REST API",
+      "status": "done",
+      "acceptance": [
+        "POST /api/v1/plugins/validate accepts an archive and returns a report ID",
+        "GET /api/v1/reports lists reports with pagination and filtering",
+        "GET /api/v1/reports/{id} returns a full report",
+        "GET /api/v1/reports/{id}/export returns report as JSON or text"
+      ],
+      "implementation": [
+        "backend/app/api/plugins.py",
+        "backend/app/api/reports.py"
+      ],
+      "tests": [
+        "backend/tests/test_api.py"
+      ]
+    },
+    {
+      "id": "report-persistence",
+      "title": "SQLite persistence and audit log",
+      "status": "done",
+      "acceptance": [
+        "Reports and checks stored in SQLite with UTC timestamps",
+        "Audit log records all validation actions",
+        "Pagination and filtering on report listing"
+      ],
+      "implementation": [
+        "backend/app/db/database.py",
+        "backend/app/models/orm.py"
+      ],
+      "tests": [
+        "backend/tests/test_api.py"
+      ]
+    },
+    {
+      "id": "llm-advisory",
+      "title": "Opt-in LLM advisory explanations",
+      "status": "done",
+      "acceptance": [
+        "POST /api/v1/reports/{id}/advisory generates natural-language explanation",
+        "Supports OpenAI-compatible, Anthropic, Gemini, Ollama providers",
+        "Errors are clear and redacted when no key or provider failure",
+        "Advisory is labeled as advisory, grounded in actual report records"
+      ],
+      "implementation": [
+        "backend/app/services/llm.py",
+        "backend/app/api/reports.py"
+      ],
+      "tests": [
+        "backend/tests/test_llm.py"
+      ]
+    },
+    {
+      "id": "frontend-dashboard",
+      "title": "React dashboard with validate/detail/export workflows",
+      "status": "done",
+      "acceptance": [
+        "Upload a plugin archive and view validation results",
+        "Search and filter reports",
+        "View detailed check results with severity filtering",
+        "Export reports as JSON or text"
+      ],
+      "implementation": [
+        "frontend/src/pages/Dashboard.tsx",
+        "frontend/src/pages/ValidatePage.tsx",
+        "frontend/src/pages/ReportDetail.tsx",
+        "frontend/src/components/"
+      ],
+      "tests": [
+        "frontend/src/tests/Dashboard.test.tsx",
+        "frontend/src/tests/UploadForm.test.tsx",
+        "frontend/src/tests/ReportDetail.test.tsx"
+      ]
+    },
+    {
+      "id": "auth-keycloak",
+      "title": "Keycloak OIDC authentication",
+      "status": "done",
+      "acceptance": [
+        "OIDC authorization code with state + nonce + PKCE",
+        "HttpOnly SameSite cookies with CSRF protection",
+        "Roles: viewer, analyst, admin",
+        "Realm import for SAML identity brokering"
+      ],
+      "implementation": [
+        "backend/app/core/security.py",
+        "keycloak/realm-export.json"
+      ],
+      "tests": [
+        "backend/tests/test_api.py"
+      ]
+    },
+    {
+      "id": "docker-compose-ci",
+      "title": "Docker, compose, CI workflow",
+      "status": "done",
+      "acceptance": [
+        "Dockerfiles with nonroot users",
+        "compose.yaml with Keycloak and persistent volumes",
+        "CI workflow testing backend and frontend"
+      ],
+      "implementation": [
+        "backend/Dockerfile",
+        "frontend/Dockerfile",
+        "compose.yaml",
+        ".github/workflows/ci.yml"
+      ],
+      "tests": []
+    }
+  ]
+}

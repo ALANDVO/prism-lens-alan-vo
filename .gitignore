@@ -20,3 +20,13 @@ htmlcov/
 .DS_Store
 *.log
 venv/
+.turbo/
+.env.local
+.env.*.local
+**/data/media/
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm

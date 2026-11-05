@@ -125,8 +125,10 @@ and symlinked components (#35).
 **Failure cases:**
 - The engine cannot detect runtime plugin loading failures that are caused by
   host environment issues (e.g., Cursor version incompatibility).
-- The Gmail scope check uses text matching on the raw JSON — false positives
-  are possible if "gmail.settings" appears in a comment or string.
+- The Gmail scope check searches MCP server configurations for Gmail settings
+  references and verifies the required scope in the server's auth/oauth
+  configuration. False positives are reduced but possible if scope is declared
+  in an unconventional location.
 - The LLM advisory requires an external provider and may produce incorrect
   explanations. It is labeled advisory and should not be treated as ground truth.
 

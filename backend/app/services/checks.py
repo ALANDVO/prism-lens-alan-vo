@@ -545,20 +545,64 @@ def check_mcp(plugin_dir: Path) -> list[CheckResult]:
                                             )
                                         )
     # OAuth scope checks (issues #385, #278)
-    raw = json.dumps(data)
-    if "gmail.settings" in raw and GMAIL_SETTINGS_SCOPE not in raw:
-        results.append(
-            _result(
-                "mcp_gmail_scope_missing",
-                "oauth",
-                Severity.warning,
-                "Gmail filter tools may require gmail.settings.basic scope",
-                f"mcp.json references Gmail settings tools but does not "
-                f"include the required scope '{GMAIL_SETTINGS_SCOPE}'. "
-                "Calls to create_filter / list_filters will return 403.",
-                file_path=str(mcp_path),
-            )
-        )
+    # Check each MCP server for Gmail settings references in args/env
+    # and verify the required scope is declared in the server's auth config
+    mcp_servers = data.get("mcpServers", data.get("servers", {}))
+    if isinstance(mcp_servers, dict):
+        for server_name, config in mcp_servers.items():
+            if isinstance(config, dict):
+                # Check if this server references Gmail settings (in command, args, or env)
+                gmail_referenced = False
+                for field in ["command", "args", "url", "env"]:
+                    value = config.get(field)
+                    if isinstance(value, str) and "gmail.settings" in value.lower():
+                        gmail_referenced = True
+                        break
+                    elif isinstance(value, list):
+                        for item in value:
+                            if isinstance(item, str) and "gmail.settings" in item.lower():
+                                gmail_referenced = True
+                                break
+                    elif isinstance(value, dict):
+                        for v in value.values():
+                            if isinstance(v, str) and "gmail.settings" in v.lower():
+                                gmail_referenced = True
+                                break
+                    if gmail_referenced:
+                        break
+                
+                if gmail_referenced:
+                    # Check if the required scope is declared in the server's auth/oauth config
+                    auth_config = config.get("auth", config.get("oauth", {}))
+                    if isinstance(auth_config, dict):
+                        scopes = auth_config.get("scopes", auth_config.get("scope", []))
+                        if isinstance(scopes, str):
+                            scopes = [scopes]
+                        has_gmail_scope = any(
+                            GMAIL_SETTINGS_SCOPE in s for s in scopes if isinstance(s, str)
+                        )
+                    else:
+                        has_gmail_scope = False
+                    
+                    # Also check global variables for the scope (fallback)
+                    if not has_gmail_scope:
+                        raw = json.dumps(data)
+                        has_gmail_scope = GMAIL_SETTINGS_SCOPE in raw
+                    
+                    if not has_gmail_scope:
+                        results.append(
+                            _result(
+                                "mcp_gmail_scope_missing",
+                                "oauth",
+                                Severity.warning,
+                                "Gmail filter tools may require gmail.settings.basic scope",
+                                f"MCP server '{server_name}' references Gmail settings tools "
+                                f"but does not include the required scope "
+                                f"'{GMAIL_SETTINGS_SCOPE}' in its auth/oauth configuration. "
+                                "Calls to create_filter / list_filters will return 403.",
+                                file_path=str(mcp_path),
+                            )
+                        )
 
     return results
 

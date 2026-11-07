@@ -255,4 +255,4 @@ Alan Vo <alanvo@gmail.com> | [github.com/ALANDVO/prism-lens-alan-vo](https://git
 
 ---
 
-Alan Vo · [alanvo.net](https://alanvo.net)
+Alan Vo · [alanvo.net](https://alanvo.net) · [X: @alanvoasi](https://x.com/alanvoasi)

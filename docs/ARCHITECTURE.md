@@ -60,3 +60,7 @@ single source of truth; reports are fetched on demand.
 - Dev mode binds to 127.0.0.1 only.
 - Archive extraction includes zip-slip protection.
 - Audit log records all validation and advisory actions.
+
+---
+
+Alan Vo · [alanvo.net](https://alanvo.net)

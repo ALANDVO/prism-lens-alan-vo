@@ -252,3 +252,7 @@ SOFTWARE.
 ---
 
 Alan Vo <alanvo@gmail.com> | [github.com/ALANDVO/prism-lens-alan-vo](https://github.com/ALANDVO/prism-lens-alan-vo)
+
+---
+
+Alan Vo · [alanvo.net](https://alanvo.net)

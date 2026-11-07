@@ -102,3 +102,6 @@ Acceptance:
 
 Implementation: `backend/Dockerfile`, `frontend/Dockerfile`, `compose.yaml`, `.github/workflows/ci.yml`
 
+---
+
+Alan Vo · [alanvo.net](https://alanvo.net)

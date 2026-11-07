@@ -80,3 +80,7 @@ with `llm_advisory` populated. Returns 503 if no key is configured.
   "llm_advisory": null
 }
 ```
+
+---
+
+Alan Vo · [alanvo.net](https://alanvo.net)

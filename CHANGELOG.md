@@ -59,3 +59,7 @@ Partial code published for continued development. Known issues: STATUS.md.
 ### Tests
 - 72 backend tests (checks, engine, API integration, LLM mocking)
 - 9 frontend tests (Dashboard, UploadForm, ReportDetail)
+
+---
+
+Alan Vo · [alanvo.net](https://alanvo.net)

@@ -311,6 +311,30 @@ class TestMCPCheck:
         results = check_mcp(plugin_dir)
         assert any(r.check_id == "mcp_gmail_scope_missing" for r in results)
 
+    def test_gmail_scope_present_in_auth(self, plugin_dir: Path):
+        """Test Gmail scope properly declared in auth config - no warning."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "gmail": {
+                        "command": "gmail-mcp",
+                        "args": ["--scopes", "gmail.settings"],
+                        "auth": {
+                            "type": "oauth2",
+                            "scopes": [
+                                "https://www.googleapis.com/auth/gmail.settings.basic"
+                            ]
+                        }
+                    }
+                },
+                "variables": {},
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        warnings = [r for r in results if r.severity == Severity.warning]
+        assert not any(r.check_id == "mcp_gmail_scope_missing" for r in warnings)
+
     def test_valid_mcp(self, plugin_dir: Path):
         _write(
             plugin_dir / "mcp.json",
@@ -329,6 +353,223 @@ class TestMCPCheck:
         errors = [r for r in results if r.severity == Severity.error]
         assert len(errors) == 0
 
+    def test_invalid_transport(self, plugin_dir: Path):
+        """Test invalid transport type."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "python",
+                        "transport": "invalid",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        assert any(r.check_id == "mcp_invalid_transport" for r in results)
+
+    def test_missing_command_stdio(self, plugin_dir: Path):
+        """Test missing command for stdio transport."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "transport": "stdio",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        assert any(r.check_id == "mcp_missing_command" for r in results)
+
+    def test_valid_stdio_transport(self, plugin_dir: Path):
+        """Test valid stdio transport with command."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "python",
+                        "args": ["-m", "myserver"],
+                        "transport": "stdio",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        errors = [r for r in results if r.severity == Severity.error]
+        assert len(errors) == 0
+
+    def test_sse_missing_url(self, plugin_dir: Path):
+        """Test SSE transport missing URL."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "transport": "sse",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        assert any(r.check_id == "mcp_missing_url_sse" for r in results)
+
+    def test_sse_invalid_url(self, plugin_dir: Path):
+        """Test SSE transport with invalid URL."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "transport": "sse",
+                        "url": "not-a-url",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        assert any(r.check_id == "mcp_invalid_url_sse" for r in results)
+
+    def test_http_valid_url(self, plugin_dir: Path):
+        """Test HTTP transport with valid URL."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "transport": "http",
+                        "url": "https://example.com/mcp",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        errors = [r for r in results if r.severity == Severity.error]
+        assert len(errors) == 0
+
+    def test_undeclared_variable_in_env(self, plugin_dir: Path):
+        """Test undeclared variable in env field."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "python",
+                        "transport": "stdio",
+                        "env": {"API_KEY": "${UNDECLARED_KEY}"},
+                    }
+                },
+                "variables": {"OTHER_KEY": {"description": "other"}}
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        assert any(r.check_id == "mcp_undeclared_variable" for r in results)
+
+    def test_invalid_auth_config(self, plugin_dir: Path):
+        """Test invalid auth configuration (not an object)."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "python",
+                        "transport": "stdio",
+                        "auth": "not-an-object",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        assert any(r.check_id == "mcp_invalid_auth_config" for r in results)
+
+    def test_unknown_auth_type(self, plugin_dir: Path):
+        """Test unknown auth type warning."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "python",
+                        "transport": "stdio",
+                        "auth": {"type": "unknown_type"},
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        warnings = [r for r in results if r.severity == Severity.warning]
+        assert any(r.check_id == "mcp_invalid_auth_type" for r in warnings)
+
+    def test_invalid_scopes_format(self, plugin_dir: Path):
+        """Test invalid scopes format."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "python",
+                        "transport": "stdio",
+                        "auth": {"scopes": "not-a-list"},
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        assert any(r.check_id == "mcp_invalid_scopes" for r in results)
+
+    def test_github_server_missing_auth_warning(self, plugin_dir: Path):
+        """Test GitHub server without auth produces warning."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "github": {
+                        "command": "python",
+                        "transport": "stdio",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        warnings = [r for r in results if r.severity == Severity.warning]
+        assert any(r.check_id == "mcp_github_auth_missing" for r in warnings)
+
+    def test_command_not_in_path_warning(self, plugin_dir: Path):
+        """Test warning for command not in PATH and not a common builtin."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "some-unknown-command",
+                        "transport": "stdio",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        warnings = [r for r in results if r.severity == Severity.warning]
+        assert any(r.check_id == "mcp_command_not_found" for r in warnings)
+
+    def test_common_builtin_no_warning(self, plugin_dir: Path):
+        """Test common builtin commands don't produce warning."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "myserver": {
+                        "command": "python3",
+                        "transport": "stdio",
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        warnings = [r for r in results if r.severity == Severity.warning]
+        assert not any(r.check_id == "mcp_command_not_found" for r in warnings)
 
 # ── Paths ─────────────────────────────────────────────────────────────
 

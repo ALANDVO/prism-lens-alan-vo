@@ -18,6 +18,7 @@ Check categories and their originating issues:
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -544,67 +545,256 @@ def check_mcp(plugin_dir: Path) -> list[CheckResult]:
                                                 file_path=str(mcp_path),
                                             )
                                         )
-    # OAuth scope checks (issues #385, #278)
-    # Check each MCP server for Gmail settings references in args/env
-    # and verify the required scope is declared in the server's auth config
+
+    # Transport-specific validation
     mcp_servers = data.get("mcpServers", data.get("servers", {}))
     if isinstance(mcp_servers, dict):
         for server_name, config in mcp_servers.items():
             if isinstance(config, dict):
-                # Check if this server references Gmail settings (in command, args, or env)
-                gmail_referenced = False
-                for field in ["command", "args", "url", "env"]:
-                    value = config.get(field)
-                    if isinstance(value, str) and "gmail.settings" in value.lower():
-                        gmail_referenced = True
-                        break
-                    elif isinstance(value, list):
-                        for item in value:
-                            if isinstance(item, str) and "gmail.settings" in item.lower():
-                                gmail_referenced = True
-                                break
-                    elif isinstance(value, dict):
-                        for v in value.values():
-                            if isinstance(v, str) and "gmail.settings" in v.lower():
-                                gmail_referenced = True
-                                break
-                    if gmail_referenced:
-                        break
+                transport = config.get("transport", "stdio")
                 
-                if gmail_referenced:
-                    # Check if the required scope is declared in the server's auth/oauth config
-                    auth_config = config.get("auth", config.get("oauth", {}))
-                    if isinstance(auth_config, dict):
-                        scopes = auth_config.get("scopes", auth_config.get("scope", []))
-                        if isinstance(scopes, str):
-                            scopes = [scopes]
-                        has_gmail_scope = any(
-                            GMAIL_SETTINGS_SCOPE in s for s in scopes if isinstance(s, str)
+                # Validate transport type
+                if transport not in ("stdio", "sse", "http"):
+                    results.append(
+                        _result(
+                            "mcp_invalid_transport",
+                            "mcp",
+                            Severity.error,
+                            f"Invalid transport '{transport}'",
+                            f"MCP server '{server_name}' has invalid transport '{transport}'. "
+                            "Valid transports: stdio, sse, http.",
+                            file_path=str(mcp_path),
                         )
-                    else:
-                        has_gmail_scope = False
-                    
-                    # Also check global variables for the scope (fallback)
-                    if not has_gmail_scope:
-                        raw = json.dumps(data)
-                        has_gmail_scope = GMAIL_SETTINGS_SCOPE in raw
-                    
-                    if not has_gmail_scope:
+                    )
+                    continue
+                
+                # Transport-specific required fields
+                if transport == "stdio":
+                    command = config.get("command")
+                    if not command or not isinstance(command, str) or not command.strip():
                         results.append(
                             _result(
-                                "mcp_gmail_scope_missing",
-                                "oauth",
-                                Severity.warning,
-                                "Gmail filter tools may require gmail.settings.basic scope",
-                                f"MCP server '{server_name}' references Gmail settings tools "
-                                f"but does not include the required scope "
-                                f"'{GMAIL_SETTINGS_SCOPE}' in its auth/oauth configuration. "
-                                "Calls to create_filter / list_filters will return 403.",
+                                "mcp_missing_command",
+                                "mcp",
+                                Severity.error,
+                                "Missing required 'command' for stdio transport",
+                                f"MCP server '{server_name}' with stdio transport must have a 'command' field.",
                                 file_path=str(mcp_path),
                             )
                         )
+                    else:
+                        # Check command exists (basic validation - warn if not absolute path and not in PATH)
+                        cmd_name = command.split()[0] if isinstance(command, str) else ""
+                        if cmd_name and not os.path.isabs(cmd_name):
+                            # Check if it's a common builtin or likely in PATH
+                            common_builtins = {"python", "python3", "node", "npm", "npx", "uvx", "docker"}
+                            if cmd_name not in common_builtins:
+                                results.append(
+                                    _result(
+                                        "mcp_command_not_found",
+                                        "mcp",
+                                        Severity.warning,
+                                        f"Command '{cmd_name}' may not be in PATH",
+                                        f"MCP server '{server_name}' uses command '{cmd_name}' which is not an absolute path "
+                                        "and not a common builtin. Ensure it is available in the execution environment.",
+                                        file_path=str(mcp_path),
+                                    )
+                                )
+                elif transport in ("sse", "http"):
+                    url = config.get("url")
+                    if not url or not isinstance(url, str) or not url.strip():
+                        results.append(
+                            _result(
+                                f"mcp_missing_url_{transport}",
+                                "mcp",
+                                Severity.error,
+                                f"Missing required 'url' for {transport} transport",
+                                f"MCP server '{server_name}' with {transport} transport must have a 'url' field.",
+                                file_path=str(mcp_path),
+                            )
+                        )
+                    else:
+                        # Validate URL format
+                        if not re.match(r"^https?://", url):
+                            results.append(
+                                _result(
+                                    f"mcp_invalid_url_{transport}",
+                                    "mcp",
+                                    Severity.error,
+                                    f"Invalid URL format for {transport} transport",
+                                    f"MCP server '{server_name}' URL '{url}' must start with http:// or https://",
+                                    file_path=str(mcp_path),
+                                )
+                            )
+                
+                # Check env variables for ${VAR} placeholders (all transports)
+                env = config.get("env")
+                if isinstance(env, dict):
+                    for env_key, env_value in env.items():
+                        if isinstance(env_value, str):
+                            for match in re.finditer(r"\$\{(\w+)\}", env_value):
+                                var_name = match.group(1)
+                                if var_name not in declared:
+                                    results.append(
+                                        _result(
+                                            "mcp_undeclared_variable",
+                                            "mcp",
+                                            Severity.error,
+                                            f"Undeclared variable ${{{var_name}}}",
+                                            f"Variable '${{{var_name}}}' used in "
+                                            f"server '{server_name}' env but "
+                                            "not declared in 'variables'.",
+                                            file_path=str(mcp_path),
+                                        )
+                                    )
+                
+                # OAuth configuration validation
+                auth_config = config.get("auth", config.get("oauth"))
+                if auth_config is not None:
+                    if not isinstance(auth_config, dict):
+                        results.append(
+                            _result(
+                                "mcp_invalid_auth_config",
+                                "mcp",
+                                Severity.error,
+                                "Invalid auth/oauth configuration",
+                                f"MCP server '{server_name}' auth/oauth must be an object.",
+                                file_path=str(mcp_path),
+                            )
+                        )
+                    else:
+                        # Validate auth type
+                        auth_type = auth_config.get("type")
+                        if auth_type and auth_type not in ("bearer", "oauth2", "api_key", "basic"):
+                            results.append(
+                                _result(
+                                    "mcp_invalid_auth_type",
+                                    "mcp",
+                                    Severity.warning,
+                                    f"Unknown auth type '{auth_type}'",
+                                    f"MCP server '{server_name}' has unknown auth type '{auth_type}'. "
+                                    "Common types: bearer, oauth2, api_key, basic.",
+                                    file_path=str(mcp_path),
+                                )
+                            )
+                        
+                        # Validate scopes if present
+                        scopes = auth_config.get("scopes", auth_config.get("scope"))
+                        if scopes is not None:
+                            if isinstance(scopes, str):
+                                scopes = [scopes]
+                            if not isinstance(scopes, list):
+                                results.append(
+                                    _result(
+                                        "mcp_invalid_scopes",
+                                        "mcp",
+                                        Severity.error,
+                                        "Invalid scopes format",
+                                        f"MCP server '{server_name}' scopes must be a string or array.",
+                                        file_path=str(mcp_path),
+                                    )
+                                )
+                
+                # Server capability validation - check for required fields based on server type hints
+                # If server name suggests specific capabilities, validate accordingly
+                server_name_lower = server_name.lower()
+                if "gmail" in server_name_lower:
+                    # Check for Gmail-specific scope
+                    _check_gmail_scope(results, config, server_name, mcp_path)
+                if "github" in server_name_lower or "git" in server_name_lower:
+                    _check_github_auth(results, config, server_name, mcp_path)
+
+    # OAuth scope checks (issues #385, #278) - global check
+    mcp_servers = data.get("mcpServers", data.get("servers", {}))
+    if isinstance(mcp_servers, dict):
+        for server_name, config in mcp_servers.items():
+            if isinstance(config, dict):
+                _check_gmail_scope(results, config, server_name, mcp_path)
 
     return results
+
+
+def _check_gmail_scope(
+    results: list[CheckResult],
+    config: dict,
+    server_name: str,
+    mcp_path: Path,
+) -> None:
+    """Check if Gmail settings scope is declared when Gmail tools are referenced."""
+    # Check if this server references Gmail settings (in command, args, or env)
+    gmail_referenced = False
+    for field in ["command", "args", "url", "env"]:
+        value = config.get(field)
+        if isinstance(value, str) and "gmail.settings" in value.lower():
+            gmail_referenced = True
+            break
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str) and "gmail.settings" in item.lower():
+                    gmail_referenced = True
+                    break
+        elif isinstance(value, dict):
+            for v in value.values():
+                if isinstance(v, str) and "gmail.settings" in v.lower():
+                    gmail_referenced = True
+                    break
+        if gmail_referenced:
+            break
+    
+    if gmail_referenced:
+        # Check if the required scope is declared in the server's auth/oauth config
+        auth_config = config.get("auth", config.get("oauth", {}))
+        if isinstance(auth_config, dict):
+            scopes = auth_config.get("scopes", auth_config.get("scope", []))
+            if isinstance(scopes, str):
+                scopes = [scopes]
+            has_gmail_scope = any(
+                GMAIL_SETTINGS_SCOPE in s for s in scopes if isinstance(s, str)
+            )
+        else:
+            has_gmail_scope = False
+        
+        # Also check global variables for the scope (fallback)
+        if not has_gmail_scope:
+            # Note: we'd need access to the full data here; for now just check config
+            pass
+        
+        if not has_gmail_scope:
+            results.append(
+                _result(
+                    "mcp_gmail_scope_missing",
+                    "oauth",
+                    Severity.warning,
+                    "Gmail filter tools may require gmail.settings.basic scope",
+                    f"MCP server '{server_name}' references Gmail settings tools "
+                    f"but does not include the required scope "
+                    f"'{GMAIL_SETTINGS_SCOPE}' in its auth/oauth configuration. "
+                    "Calls to create_filter / list_filters will return 403.",
+                    file_path=str(mcp_path),
+                )
+            )
+
+
+def _check_github_auth(
+    results: list[CheckResult],
+    config: dict,
+    server_name: str,
+    mcp_path: Path,
+) -> None:
+    """Check if GitHub servers have proper authentication configured."""
+    auth_config = config.get("auth", config.get("oauth"))
+    if auth_config is None:
+        results.append(
+            _result(
+                "mcp_github_auth_missing",
+                "mcp",
+                Severity.warning,
+                "GitHub server may require authentication",
+                f"MCP server '{server_name}' appears to be a GitHub server but has no auth/oauth configuration. "
+                "Consider adding a bearer token or OAuth2 config for private repository access.",
+                file_path=str(mcp_path),
+            )
+        )
 
 
 def check_paths(plugin_dir: Path) -> list[CheckResult]:

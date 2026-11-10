@@ -4,7 +4,7 @@ Each round completes one feature or repair. Future items are planned, not implem
 
 ## Current round
 
-docker-compose-ci
+enhanced-mcp-validation
 
 ## Roadmap
 
@@ -101,6 +101,22 @@ Acceptance:
 - CI workflow testing backend and frontend
 
 Implementation: `backend/Dockerfile`, `frontend/Dockerfile`, `compose.yaml`, `.github/workflows/ci.yml`
+
+### enhanced-mcp-validation — Enhanced MCP server validation
+
+Status: in_progress
+
+Acceptance:
+- Transport-specific validation for stdio, sse, http transports
+- Required field validation per transport (command for stdio, URL for sse/http)
+- Environment variable placeholder validation across all transport config fields
+- OAuth configuration validation (auth type, scopes format)
+- Server-type heuristics: Gmail servers require gmail.settings.basic scope, GitHub servers warned if missing auth
+- Command availability warning for non-builtin stdio commands
+
+Implementation: `backend/app/services/checks.py`
+
+Tests: `backend/tests/test_checks.py`
 
 ---
 

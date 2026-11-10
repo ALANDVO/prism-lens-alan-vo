@@ -1,9 +1,29 @@
 # Changelog
 
+## 1.3.0 — work-in-progress checkpoint
+
+Partial code published for continued development. Known issues: STATUS.md.
+
 ## 1.2.0 — work-in-progress checkpoint
 
 Partial code published for continued development. Known issues: STATUS.md.
 
+### Added
+- **Enhanced MCP validation** (`backend/app/services/checks.py`): Transport-specific
+  validation for `stdio`, `sse`, and `http` transports with required field checks
+  (command for stdio, URL for sse/http). Environment variable placeholder
+  validation across all transport fields. OAuth configuration validation
+  including auth type and scopes format. Server-type heuristics: Gmail servers
+  validated for `gmail.settings.basic` scope, GitHub servers warned if missing
+  authentication. Command availability warning for non-builtin stdio commands.
+
+### Changed
+- **Improved Gmail scope check** (`backend/app/services/checks.py`): The
+  `check_mcp` function now searches for Gmail settings references specifically
+  in MCP server configurations (command, args, url, env) and verifies the
+  required `gmail.settings.basic` OAuth scope in the server's `auth` or `oauth`
+  configuration section. This reduces false positives from the previous raw-JSON
+  string search (issue #385).
 ## 1.1.0 — work-in-progress checkpoint
  
 Partial code published for continued development. Known issues: STATUS.md.

@@ -681,8 +681,6 @@ def check_mcp(plugin_dir: Path) -> list[CheckResult]:
                         # Validate scopes if present
                         scopes = auth_config.get("scopes", auth_config.get("scope"))
                         if scopes is not None:
-                            if isinstance(scopes, str):
-                                scopes = [scopes]
                             if not isinstance(scopes, list):
                                 results.append(
                                     _result(

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prism-lens-alan-vo"
-version = "1.0.0"
+version = "1.4.0"
 description = "Diagnostic tool for Cursor plugins — validates plugin structure and explains loading failures."
 readme = "README.md"
 license = "MIT"

@@ -1,6 +1,6 @@
 {
   "name": "prism-lens-alan-vo",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "Diagnostic tool for Cursor plugins",
   "email": "alanvo@gmail.com",

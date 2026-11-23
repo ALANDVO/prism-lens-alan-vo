@@ -484,8 +484,10 @@ def check_mcp(plugin_dir: Path) -> list[CheckResult]:
     # Check ${VAR} placeholders are declared in variables (issue #531)
     variables = data.get("variables", {})
     declared = set(variables.keys()) if isinstance(variables, dict) else set()
-    declared.update(k for k, v in (variables.items() if isinstance(variables, dict) else []))
 
+    # Transport-specific validation and placeholder checks share one loop over
+    # servers so each server is visited exactly once; a second pass would
+    # duplicate every finding for the same server.
     mcp_servers = data.get("mcpServers", data.get("servers", {}))
     if isinstance(mcp_servers, dict):
         for server_name, config in mcp_servers.items():
@@ -546,8 +548,6 @@ def check_mcp(plugin_dir: Path) -> list[CheckResult]:
                                             )
                                         )
 
-    # Transport-specific validation
-    mcp_servers = data.get("mcpServers", data.get("servers", {}))
     if isinstance(mcp_servers, dict):
         for server_name, config in mcp_servers.items():
             if isinstance(config, dict):
@@ -701,13 +701,6 @@ def check_mcp(plugin_dir: Path) -> list[CheckResult]:
                     _check_gmail_scope(results, config, server_name, mcp_path)
                 if "github" in server_name_lower or "git" in server_name_lower:
                     _check_github_auth(results, config, server_name, mcp_path)
-
-    # OAuth scope checks (issues #385, #278) - global check
-    mcp_servers = data.get("mcpServers", data.get("servers", {}))
-    if isinstance(mcp_servers, dict):
-        for server_name, config in mcp_servers.items():
-            if isinstance(config, dict):
-                _check_gmail_scope(results, config, server_name, mcp_path)
 
     return results
 

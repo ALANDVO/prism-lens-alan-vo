@@ -554,6 +554,56 @@ class TestMCPCheck:
         warnings = [r for r in results if r.severity == Severity.warning]
         assert any(r.check_id == "mcp_command_not_found" for r in warnings)
 
+    def test_no_duplicate_findings_per_server(self, plugin_dir: Path):
+        """A single server must be visited once, not once per check phase.
+
+        Transport validation, placeholder validation and OAuth scope checks all
+        run per server; if each phase re-iterates the server map, the same
+        finding is emitted repeatedly and inflates the report counts.
+        """
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "gmail": {
+                        "command": "gmail-mcp",
+                        "args": ["-m", "server"],
+                        "env": {
+                            "GMAIL_SCOPES": "${GMAIL_SCOPES}",
+                            "GMAIL_TOKEN": "gmail.settings.basic",
+                        },
+                    }
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        gmail_warnings = [
+            r for r in results if r.check_id == "mcp_gmail_scope_missing"
+        ]
+        assert len(gmail_warnings) == 1
+        undeclared = [
+            r for r in results if r.check_id == "mcp_undeclared_variable"
+        ]
+        assert len(undeclared) == 1
+        # Also assert no finding pair is identical for the same server config.
+        keys = [(r.check_id, r.title, r.message, r.file_path) for r in results]
+        assert len(keys) == len(set(keys))
+
+    def test_multi_server_findings_not_duplicated(self, plugin_dir: Path):
+        """Two servers with the same defect yield two findings, not four."""
+        _write(
+            plugin_dir / "mcp.json",
+            json.dumps({
+                "mcpServers": {
+                    "sse-a": {"transport": "sse", "url": "not-a-url"},
+                    "sse-b": {"transport": "sse", "url": "not-a-url"},
+                }
+            }),
+        )
+        results = check_mcp(plugin_dir)
+        invalid = [r for r in results if r.check_id == "mcp_invalid_url_sse"]
+        assert len(invalid) == 2
+
     def test_common_builtin_no_warning(self, plugin_dir: Path):
         """Test common builtin commands don't produce warning."""
         _write(

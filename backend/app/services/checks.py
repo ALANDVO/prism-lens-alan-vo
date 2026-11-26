@@ -627,26 +627,6 @@ def check_mcp(plugin_dir: Path) -> list[CheckResult]:
                                 )
                             )
                 
-                # Check env variables for ${VAR} placeholders (all transports)
-                env = config.get("env")
-                if isinstance(env, dict):
-                    for env_key, env_value in env.items():
-                        if isinstance(env_value, str):
-                            for match in re.finditer(r"\$\{(\w+)\}", env_value):
-                                var_name = match.group(1)
-                                if var_name not in declared:
-                                    results.append(
-                                        _result(
-                                            "mcp_undeclared_variable",
-                                            "mcp",
-                                            Severity.error,
-                                            f"Undeclared variable ${{{var_name}}}",
-                                            f"Variable '${{{var_name}}}' used in "
-                                            f"server '{server_name}' env but "
-                                            "not declared in 'variables'.",
-                                            file_path=str(mcp_path),
-                                        )
-                                    )
                 
                 # OAuth configuration validation
                 auth_config = config.get("auth", config.get("oauth"))

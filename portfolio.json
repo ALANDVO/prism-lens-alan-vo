@@ -17,6 +17,6 @@
     "Request an opt-in LLM advisory that explains why detected findings would block plugin loading, grounded in the actual check records"
   ],
   "summary": "Work in progress: prism-lens-alan-vo",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "status": "work-in-progress"
 }
